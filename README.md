@@ -1,28 +1,37 @@
-# LUCHA GAUCHA 🥊🧉
+# Patada de Clandestino 🥊🧉
 
-Juego de pelea 8-bit ambientado en la pampa argentina. Parodia satírica.
-Stack: **Phaser 3** (web) + hosting en **Firebase**.
-
-## Estado
-- [x] Boceto de pantalla de selección (`public/index.html`)
-- [ ] Motor de pelea (Phaser 3): movimiento, hitboxes, vida, rounds
-- [ ] Sprites animados de los 2 personajes
-- [ ] IA del jefe (CPU)
-- [ ] Sonido 8-bit
+Juego de pelea web, parodia satírica argentina.
+Stack: **Phaser 3** (local, sin CDN) + hosting en **Firebase**.
 
 ## Personajes
-- **El Comandante** (héroe) — grandote, vincha guerrillera, mate. Gana pensando en el otro.
-- **El Pelucón** (villano/CPU) — petiso, peluca enorme, motosierra. No piensa en nadie.
+- **El Presidente** (héroe, jugador) — cara real sobre cuerpo camuflado, con mate. Gana pensando en el otro.
+- **El Ex Presidente** (villano, CPU) — petiso, peluca enorme, motosierra.
+
+## Estructura
+```
+public/
+  index.html        página principal (el juego)
+  seleccion.html    pantalla de selección
+  js/game.js        motor completo (física, hitboxes, rounds, input)
+  vendor/phaser.min.js   Phaser local (no depende de CDN)
+  assets/           imágenes (presidente.png)
+```
+
+## Estado
+- [x] Motor de pelea: movimiento, salto, hitboxes, vida, KO, mejor de 3 rounds
+- [x] Controles teclado + botones táctiles (celular)
+- [x] Responsivo (se adapta a cualquier pantalla)
+- [x] Cara real del Presidente sobre cuerpo camuflado
+- [ ] Sprites animados (idle/golpe)
+- [ ] Lógica del rival (CPU) más avanzada
+- [ ] Sonido
 
 ## Correr local
-Abrí `public/index.html` en el navegador (doble clic) o serví la carpeta:
 ```bash
 cd public && python3 -m http.server 5500   # http://localhost:5500
 ```
 
-## Deploy a Firebase (cuando tengas el hosting)
+## Deploy a Firebase
 ```bash
-firebase login
-# poné tu project id en .firebaserc
-firebase deploy --only hosting
+firebase deploy --only hosting --project juegoclandestino
 ```

@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "juegoclandestino",
     "public": "public",
     "cleanUrls": true,
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
