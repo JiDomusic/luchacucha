@@ -44,11 +44,28 @@
       <div class="btn hit" data-k="kick">PATADA</div>
     </div>
   </div>
-  <a class="back" href="index.html">← volver a selección</a>
+  <a class="back" href="seleccion.html">← ver pantalla de selección</a>
 
 <script>
-// estado de controles táctiles/mouse (compartido con el juego)
-const touch={left:false,right:false,down:false,jump:false,punch:false,kick:false};
+// ---- INPUT unificado (teclado directo de la ventana + botones) ----
+const touch={left:false,right:false,down:false,jump:false,punch:false,kick:false,enter:false};
+window.addEventListener('keydown',e=>{
+  switch(e.code){
+    case 'ArrowLeft':  touch.left=true;  e.preventDefault(); break;
+    case 'ArrowRight': touch.right=true; e.preventDefault(); break;
+    case 'ArrowDown':  touch.down=true;  e.preventDefault(); break;
+    case 'ArrowUp':    touch.jump=true;  e.preventDefault(); break;
+    case 'KeyZ':       touch.punch=true; break;
+    case 'KeyX':       touch.kick=true;  break;
+    case 'Enter':      touch.enter=true; break;
+  }
+});
+window.addEventListener('keyup',e=>{
+  if(e.code==='ArrowLeft')  touch.left=false;
+  if(e.code==='ArrowRight') touch.right=false;
+  if(e.code==='ArrowDown')  touch.down=false;
+});
+// botones en pantalla (mouse + dedo)
 document.querySelectorAll('#pad .btn').forEach(b=>{
   const k=b.dataset.k;
   const press=e=>{ e.preventDefault(); b.classList.add('on');
@@ -56,10 +73,8 @@ document.querySelectorAll('#pad .btn').forEach(b=>{
     else if(k==='kick') touch.kick=true; else touch[k]=true; };
   const release=e=>{ e.preventDefault(); b.classList.remove('on');
     if(k==='left'||k==='right'||k==='down') touch[k]=false; };
-  b.addEventListener('pointerdown',press);
-  b.addEventListener('pointerup',release);
-  b.addEventListener('pointerleave',release);
-  b.addEventListener('pointercancel',release);
+  ['pointerdown','mousedown','touchstart'].forEach(ev=>b.addEventListener(ev,press,{passive:false}));
+  ['pointerup','pointerleave','pointercancel','mouseup','touchend'].forEach(ev=>b.addEventListener(ev,release,{passive:false}));
 });
 </script>
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
@@ -183,15 +198,22 @@ function villainCanvas(){
 /* ---------------- ESCENA ---------------- */
 class Fight extends Phaser.Scene{
   constructor(){super('Fight');}
-  preload(){ this.textures.addCanvas('hero',heroCanvas()); this.textures.addCanvas('villain',villainCanvas()); }
+  preload(){
+    this.textures.addCanvas('hero',heroCanvas()); this.textures.addCanvas('villain',villainCanvas());
+    // si existen imágenes reales, se usan en vez del dibujo
+    this.heroTex='hero'; this.villTex='villain';
+    this.load.image('heroImg','assets/comandante.png');
+    this.load.image('villImg','assets/pelucon.png');
+    this.load.on('filecomplete-image-heroImg',()=>this.heroTex='heroImg');
+    this.load.on('filecomplete-image-villImg',()=>this.villTex='villImg');
+    this.load.on('loaderror',()=>{}); // ignorar si no existen todavía
+  }
   create(){
     this.drawStage();
-    this.p1=this.mkFighter(240,'hero',1,false); this.p2=this.mkFighter(680,'villain',-1,true);
+    this.p1=this.mkFighter(240,this.heroTex,1,false); this.p2=this.mkFighter(680,this.villTex,-1,true);
     this.p1.foe=this.p2; this.p2.foe=this.p1;
     this.hud=this.buildHUD();
-    this.keys=this.input.keyboard.addKeys('LEFT,RIGHT,UP,DOWN,Z,X,ENTER');
-    // que las flechas no scrolleen la página
-    this.input.keyboard.addCapture('LEFT,RIGHT,UP,DOWN,Z,X,ENTER,SPACE');
+    this.add.text(W-8,H-6,'v3',{fontFamily:'Oswald',fontSize:'11px',color:'#6a5a3a'}).setOrigin(1,1).setDepth(80);
     this.winsP1=0;this.winsP2=0;this.roundNo=0; this.startRound();
   }
 
@@ -228,9 +250,9 @@ class Fight extends Phaser.Scene{
   }
 
   mkFighter(x,tex,facing,isCPU){
-    const s=this.add.image(x,GROUND,tex).setOrigin(.5,1).setScale(1.05);
-    s.setFlipX(facing<0);
-    return {sprite:s,hp:100,facing,isCPU,vx:0,vy:0,onGround:true,state:'idle',stateT:0,cool:0,
+    const s=this.add.image(x,GROUND,tex).setOrigin(.5,1);
+    const base=215/s.height; s.setScale(base); s.setFlipX(facing<0); // normaliza alto (dibujo o imagen real)
+    return {sprite:s,base,hp:100,facing,isCPU,vx:0,vy:0,onGround:true,state:'idle',stateT:0,cool:0,
       hitDone:false,attackKind:'punch',attackActive:false,block:false,stun:0,think:0,ko:false,active:false};
   }
 
@@ -295,7 +317,8 @@ class Fight extends Phaser.Scene{
 
   update(t,delta){
     const dt=delta/1000;
-    if(this.matchOver){ if(Phaser.Input.Keyboard.JustDown(this.keys.ENTER)){this.winsP1=this.winsP2=0;this.roundNo=0;this.startRound();} return; }
+    if(this.matchOver){ if(touch.enter){touch.enter=false;this.winsP1=this.winsP2=0;this.roundNo=0;this.startRound();} return; }
+    touch.enter=false;
     this.step(this.p1,dt,true); this.step(this.p2,dt,false);
     this.resolve(); this.updateHUD();
   }
@@ -314,17 +337,14 @@ class Fight extends Phaser.Scene{
     if(s.y>=GROUND){s.y=GROUND;f.vy=0;f.onGround=true;} else f.onGround=false;
     s.x=Phaser.Math.Clamp(s.x,50,W-50);
     s.setAngle(f.state==='attack'&&f.attackActive?f.facing*7:0);
-    s.setScale(1.05, f.block?.95:1.05);
+    s.setScale(f.base, f.block?f.base*.9:f.base); // el giro lo maneja setFlipX
   }
   playerInput(f){
-    const k=this.keys;
-    const left=k.LEFT.isDown||touch.left, right=k.RIGHT.isDown||touch.right, down=k.DOWN.isDown||touch.down;
-    const up=k.UP.isDown||touch.jump;
-    if(down&&f.onGround) f.block=true;
-    else{ if(left)f.vx=-260; if(right)f.vx=260; if(up&&f.onGround){f.vy=-600;f.onGround=false;} }
+    if(touch.down&&f.onGround) f.block=true;
+    else{ if(touch.left)f.vx=-260; if(touch.right)f.vx=260; if(touch.jump&&f.onGround){f.vy=-600;f.onGround=false;} }
     touch.jump=false; // el salto es de un toque
-    if(Phaser.Input.Keyboard.JustDown(k.Z)||touch.punch){ this.tryAttack(f,'punch'); touch.punch=false; }
-    if(Phaser.Input.Keyboard.JustDown(k.X)||touch.kick){ this.tryAttack(f,'kick'); touch.kick=false; }
+    if(touch.punch){ this.tryAttack(f,'punch'); touch.punch=false; }
+    if(touch.kick){ this.tryAttack(f,'kick'); touch.kick=false; }
   }
   cpuInput(f,dt){
     const d=f.foe.sprite.x-f.sprite.x, ad=Math.abs(d); f.think-=dt*1000;
