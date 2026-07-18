@@ -309,6 +309,15 @@ class Fight extends Phaser.Scene {
 }
 
 window.game = new Phaser.Game({
-  type: Phaser.AUTO, width: W, height: H, parent: 'game',
-  backgroundColor: '#0d0b0a', antialias: true, scene: [Fight]
+  type: Phaser.AUTO,
+  parent: 'game',
+  backgroundColor: '#0d0b0a',
+  antialias: true,
+  scale: {
+    mode: Phaser.Scale.FIT,            // escala manteniendo proporción
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: W,
+    height: H
+  },
+  scene: [Fight]
 });

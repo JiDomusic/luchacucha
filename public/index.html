@@ -6,10 +6,13 @@
 <title>Juego Clandestino</title>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Special+Elite&display=swap" rel="stylesheet" />
 <style>
-  html,body{margin:0;height:100%;background:#0d0b0a;color:#efe6d6;
+  html,body{margin:0;min-height:100%;background:#0d0b0a;color:#efe6d6;
     font-family:'Oswald',system-ui,sans-serif;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
-  #game{border-radius:6px;box-shadow:0 18px 50px rgba(0,0,0,.7),0 0 0 1px #2a241c}
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:10px}
+  #game{width:min(96vw,920px);aspect-ratio:920/540;border-radius:6px;overflow:hidden;
+    box-shadow:0 18px 50px rgba(0,0,0,.7),0 0 0 1px #2a241c}
+  #game canvas{display:block}
+  .rotate{display:none;font-size:12px;color:#e8c15a}
   .hint{font-size:14px;color:#c9b58a;text-align:center;line-height:1.9;max-width:900px;letter-spacing:.5px}
   .hint b{color:#e8c15a}
   a.back{font-family:'Special Elite',monospace;font-size:13px;color:#9ab0c0;text-decoration:none;opacity:.8}
@@ -24,9 +27,22 @@
   .btn:active,.btn.on{transform:translateY(3px);box-shadow:0 1px 0 #0d0b08;background:#3a2f20}
   .btn.hit{border-color:#e0432a;color:#ffcf7a}
   .btn.jump{border-color:#8fb14a}
+  /* responsivo: pantallas chicas */
+  @media (max-width:640px){
+    body{gap:8px;padding:6px}
+    .hint{font-size:11px;line-height:1.7}
+    #pad{gap:8px}
+    .btn{width:52px;height:52px;font-size:12px;border-radius:11px}
+    kbd{display:none}
+  }
+  /* aviso girar el celular (sólo vertical y chico) */
+  @media (max-width:640px) and (orientation:portrait){
+    .rotate{display:block}
+  }
 </style>
 </head>
 <body>
+  <div class="rotate">📱↔️ Girá el teléfono para verlo más grande</div>
   <div id="game"></div>
   <div class="hint">
     <b>EL PRESIDENTE</b> &nbsp;·&nbsp; <kbd>←</kbd><kbd>→</kbd> mover &nbsp; <kbd>↑</kbd> saltar &nbsp; <kbd>↓</kbd> cubrirse &nbsp; <kbd>Z</kbd> puño &nbsp; <kbd>X</kbd> patada &nbsp;·&nbsp; <kbd>Enter</kbd> reiniciar
