@@ -321,3 +321,10 @@ window.game = new Phaser.Game({
   },
   scene: [Fight]
 });
+
+// re-escalar al girar el teléfono / redimensionar
+['resize','orientationchange'].forEach(ev =>
+  window.addEventListener(ev, () => setTimeout(() => {
+    if (window.game && window.game.scale) window.game.scale.refresh();
+  }, 200))
+);
