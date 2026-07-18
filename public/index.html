@@ -200,13 +200,7 @@ class Fight extends Phaser.Scene{
   constructor(){super('Fight');}
   preload(){
     this.textures.addCanvas('hero',heroCanvas()); this.textures.addCanvas('villain',villainCanvas());
-    // si existen imágenes reales, se usan en vez del dibujo
     this.heroTex='hero'; this.villTex='villain';
-    this.load.image('heroImg','assets/comandante.png');
-    this.load.image('villImg','assets/pelucon.png');
-    this.load.on('filecomplete-image-heroImg',()=>this.heroTex='heroImg');
-    this.load.on('filecomplete-image-villImg',()=>this.villTex='villImg');
-    this.load.on('loaderror',()=>{}); // ignorar si no existen todavía
   }
   create(){
     this.drawStage();
