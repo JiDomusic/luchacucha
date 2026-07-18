@@ -349,7 +349,7 @@ class Fight extends Phaser.Scene{
   cpuInput(f,dt){
     const d=f.foe.sprite.x-f.sprite.x, ad=Math.abs(d); f.think-=dt*1000;
     if(f.foe.state==='attack'&&ad<100&&Math.random()<.15){f.block=true;return;}
-    if(ad>95)f.vx=Phaser.Math.Sign(d)*230; else if(ad<58)f.vx=-Phaser.Math.Sign(d)*180;
+    if(ad>95)f.vx=Math.sign(d)*230; else if(ad<58)f.vx=-Math.sign(d)*180;
     if(f.think<=0){ f.think=Phaser.Math.Between(300,700);
       if(ad<86&&f.onGround)this.tryAttack(f,Math.random()<.5?'punch':'kick');
       else if(Math.random()<.15&&f.onGround){f.vy=-560;f.onGround=false;} }
@@ -366,7 +366,7 @@ class Fight extends Phaser.Scene{
   updateHUD(){ this.hud.l.bar.width=this.hud.l.full*(this.p1.hp/100); this.hud.r.bar.width=this.hud.r.full*(this.p2.hp/100); }
 }
 
-new Phaser.Game({ type:Phaser.AUTO,width:W,height:H,parent:'game',backgroundColor:'#0d0b0a',antialias:true,scene:[Fight] });
+window.game = new Phaser.Game({ type:Phaser.AUTO,width:W,height:H,parent:'game',backgroundColor:'#0d0b0a',antialias:true,scene:[Fight] });
 </script>
 </body>
 </html>
