@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Juego Clandestino — Pelea</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Special+Elite&display=swap" rel="stylesheet" />
+<style>
+  html,body{margin:0;height:100%;background:#0d0b0a;color:#efe6d6;
+    font-family:'Oswald',system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+  #game{border-radius:6px;box-shadow:0 18px 50px rgba(0,0,0,.7),0 0 0 1px #2a241c}
+  .hint{font-size:14px;color:#c9b58a;text-align:center;line-height:1.9;max-width:900px;letter-spacing:.5px}
+  .hint b{color:#e8c15a}
+  a.back{font-family:'Special Elite',monospace;font-size:13px;color:#9ab0c0;text-decoration:none;opacity:.8}
+  kbd{background:#221d16;border:1px solid #453a29;border-radius:4px;padding:1px 7px;color:#efe6d6}
+  /* controles táctiles / mouse */
+  #pad{display:flex;justify-content:space-between;width:min(920px,100%);gap:16px;
+    user-select:none;-webkit-user-select:none;touch-action:none}
+  .cluster{display:flex;gap:10px;flex-wrap:wrap}
+  .btn{width:66px;height:66px;border-radius:14px;border:2px solid #4a3a26;
+    background:#221d16;color:#efe6d6;font-family:'Oswald';font-size:15px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:0 4px 0 #0d0b08;transition:transform .05s}
+  .btn:active,.btn.on{transform:translateY(3px);box-shadow:0 1px 0 #0d0b08;background:#3a2f20}
+  .btn.hit{border-color:#e0432a;color:#ffcf7a}
+  .btn.jump{border-color:#8fb14a}
+</style>
+</head>
+<body>
+  <div id="game"></div>
+  <div class="hint">
+    <b>EL PRESIDENTE</b> &nbsp;·&nbsp; <kbd>←</kbd><kbd>→</kbd> mover &nbsp; <kbd>↑</kbd> saltar &nbsp; <kbd>↓</kbd> cubrirse &nbsp; <kbd>Z</kbd> puño &nbsp; <kbd>X</kbd> patada &nbsp;·&nbsp; <kbd>Enter</kbd> reiniciar
+  </div>
+  <div id="pad">
+    <div class="cluster">
+      <div class="btn" data-k="left">◀</div>
+      <div class="btn jump" data-k="up">▲<br>SALTO</div>
+      <div class="btn" data-k="right">▶</div>
+      <div class="btn" data-k="down">CUBRIR</div>
+    </div>
+    <div class="cluster">
+      <div class="btn hit" data-k="punch">PUÑO</div>
+      <div class="btn hit" data-k="kick">PATADA</div>
+    </div>
+  </div>
+  <a class="back" href="seleccion.html">← ver pantalla de selección</a>
+
+<script>
+// ---- INPUT unificado (teclado directo de la ventana + botones) ----
+const touch={left:false,right:false,down:false,jump:false,punch:false,kick:false,enter:false};
+window.addEventListener('keydown',e=>{
+  switch(e.code){
+    case 'ArrowLeft':  touch.left=true;  e.preventDefault(); break;
+    case 'ArrowRight': touch.right=true; e.preventDefault(); break;
+    case 'ArrowDown':  touch.down=true;  e.preventDefault(); break;
+    case 'ArrowUp':    touch.jump=true;  e.preventDefault(); break;
+    case 'KeyZ':       touch.punch=true; break;
+    case 'KeyX':       touch.kick=true;  break;
+    case 'Enter':      touch.enter=true; break;
+  }
+});
+window.addEventListener('keyup',e=>{
+  if(e.code==='ArrowLeft')  touch.left=false;
+  if(e.code==='ArrowRight') touch.right=false;
+  if(e.code==='ArrowDown')  touch.down=false;
+});
+// botones en pantalla (mouse + dedo)
+document.querySelectorAll('#pad .btn').forEach(b=>{
+  const k=b.dataset.k;
+  const press=e=>{ e.preventDefault(); b.classList.add('on');
+    if(k==='up') touch.jump=true; else if(k==='punch') touch.punch=true;
+    else if(k==='kick') touch.kick=true; else touch[k]=true; };
+  const release=e=>{ e.preventDefault(); b.classList.remove('on');
+    if(k==='left'||k==='right'||k==='down') touch[k]=false; };
+  ['pointerdown','mousedown','touchstart'].forEach(ev=>b.addEventListener(ev,press,{passive:false}));
+  ['pointerup','pointerleave','pointercancel','mouseup','touchend'].forEach(ev=>b.addEventListener(ev,release,{passive:false}));
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+<script>
+const W=920, H=540, GROUND=470, GRAV=1500;
+
+/* ---------------- helpers de dibujo (ilustración con sombreado) ---------------- */
+function C(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c;}
+function ell(ctx,cx,cy,rx,ry,col,rot=0){ctx.save();ctx.translate(cx,cy);ctx.rotate(rot);ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,0,7);ctx.fillStyle=col;ctx.fill();ctx.restore();}
+function rr(ctx,x,y,w,h,r,col){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();ctx.fillStyle=col;ctx.fill();}
+// camuflaje militar: base + manchas estables
+function camo(ctx,x,y,w,h){
+  rr(ctx,x,y,w,h,6,'#5b6338');
+  const blobs=[[.15,.2,.22],[.55,.12,.26],[.78,.35,.2],[.3,.55,.28],[.62,.7,.24],[.1,.78,.2],[.85,.72,.18],[.42,.32,.16]];
+  const cols=['#3f4726','#77794a','#8a7248','#2c3119'];
+  ctx.save();ctx.beginPath();rr(ctx,x,y,w,h,6,'#000');ctx.clip();
+  blobs.forEach((b,i)=>ell(ctx,x+b[0]*w,y+b[1]*h,b[2]*w*.6,b[2]*h*.5,cols[i%4]));
+  ctx.restore();
+}
+function shade(ctx,cx,cy,rx,ry,c1,c2){
+  const g=ctx.createRadialGradient(cx-rx*.3,cy-ry*.4,ry*.2,cx,cy,rx*1.1);
+  g.addColorStop(0,c1);g.addColorStop(1,c2);
+  ctx.save();ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,7);ctx.fillStyle=g;ctx.fill();ctx.restore();
+}
+
+/* ---------------- EL PRESIDENTE (basado en la referencia real) ---------------- */
+/* paño/turbante blanco, barba tupida, campera camuflada, mate */
+function heroCanvas(){
+  const c=C(150,210),x=c.getContext('2d');
+  const SKIN='#d59a6e',SKINd='#b0774d',SKINh='#e6b487';
+  // sombra piso
+  ell(x,75,204,44,8,'rgba(0,0,0,.35)');
+  // piernas camufladas
+  camo(x,52,138,20,60); camo(x,80,138,20,60);
+  rr(x,50,196,26,12,4,'#241d14'); rr(x,76,196,26,12,4,'#241d14'); // borceguíes
+  // torso: campera militar abierta
+  camo(x,42,96,66,66);
+  rr(x,64,100,22,60,4,'#2f2a20'); // apertura/remera oscura al centro
+  rr(x,68,104,14,40,3,'#3c5a3c'); // remera verde
+  // brazos
+  camo(x,34,100,20,52); camo(x,96,100,20,50);
+  shade(x,44,156,12,12,SKINh,SKINd); // mano izq
+  shade(x,106,152,12,12,SKINh,SKINd); // mano der
+  // mate en mano izq
+  rr(x,30,150,20,20,7,'#6f4423'); ell(x,40,159,9,9,'#8a5a2f'); rr(x,44,138,4,16,2,'#c9c9c9');
+  // cuello
+  rr(x,66,86,22,16,4,SKINd);
+  // cabeza
+  shade(x,77,60,30,34,SKINh,SKINd);
+  // orejas
+  ell(x,48,60,6,9,SKINd); ell(x,106,60,6,9,SKINd);
+  // barba tupida (envuelve mandíbula)
+  x.fillStyle='#241811';
+  x.beginPath();x.moveTo(50,58);x.quadraticCurveTo(48,96,77,104);x.quadraticCurveTo(106,96,104,58);
+  x.quadraticCurveTo(96,86,77,88);x.quadraticCurveTo(58,86,50,58);x.closePath();x.fill();
+  ell(x,77,92,26,16,'#241811'); // volumen barba
+  ell(x,77,94,20,9,'#33241a'); // brillo barba
+  // boca dentro de la barba
+  rr(x,70,80,14,4,2,'#7a3b34');
+  // nariz
+  ell(x,77,72,7,9,SKINd); ell(x,77,70,5,6,SKINh);
+  // ojos
+  ell(x,66,62,6,4,'#fff'); ell(x,88,62,6,4,'#fff');
+  ell(x,66,62,3,3,'#2a1c12'); ell(x,88,62,3,3,'#2a1c12');
+  // cejas
+  rr(x,60,54,14,4,2,'#241811'); rr(x,80,54,14,4,2,'#241811');
+  // TURBANTE/paño blanco
+  x.save();
+  const tg=x.createLinearGradient(46,20,110,40);tg.addColorStop(0,'#f4f1e6');tg.addColorStop(1,'#d7d1bf');
+  x.fillStyle=tg;
+  x.beginPath();x.moveTo(48,52);x.quadraticCurveTo(44,14,77,12);x.quadraticCurveTo(110,14,106,52);
+  x.quadraticCurveTo(96,34,77,34);x.quadraticCurveTo(58,34,48,52);x.closePath();x.fill();
+  // pliegues del paño
+  x.strokeStyle='rgba(150,143,120,.6)';x.lineWidth=2;
+  x.beginPath();x.moveTo(56,44);x.quadraticCurveTo(77,26,100,44);x.stroke();
+  x.beginPath();x.moveTo(60,34);x.quadraticCurveTo(77,20,96,34);x.stroke();
+  x.restore();
+  ell(x,104,44,8,7,'#e9e4d4'); // nudo lateral del paño
+  return c;
+}
+
+/* ---------------- EL PELUCÓN (caricatura libertaria) ---------------- */
+function villainCanvas(){
+  const c=C(150,210),x=c.getContext('2d');
+  const SKIN='#d8a074',SKINd='#b47f52',SKINh='#e8bb8d',SUIT='#1c1a20',SUITh='#33303a',WIG='#241d18',WIGh='#3a2e24';
+  ell(x,75,204,38,8,'rgba(0,0,0,.35)');
+  // piernas (petiso)
+  rr(x,58,158,16,44,4,'#131218'); rr(x,78,158,16,44,4,'#131218');
+  rr(x,54,196,24,12,4,'#0d0d10'); rr(x,74,196,24,12,4,'#0d0d10');
+  // saco
+  rr(x,50,110,52,54,8,SUIT); rr(x,50,110,52,10,8,SUITh);
+  rr(x,68,112,16,52,3,'#efe9df'); rr(x,73,112,6,40,2,'#6a3fa0'); // camisa + corbata violeta
+  rr(x,58,116,10,46,4,SUITh); rr(x,84,116,10,46,4,SUITh); // solapas
+  // brazos cortos
+  rr(x,40,116,16,42,6,SUIT); rr(x,96,116,16,40,6,SUIT);
+  shade(x,48,158,10,10,SKINh,SKINd); shade(x,104,152,10,10,SKINh,SKINd);
+  // motosierra
+  rr(x,96,138,34,16,5,'#e8c000'); rr(x,96,138,34,5,5,'#fff06a');
+  rr(x,128,142,22,8,3,'#b9b9c2'); // barra
+  for(let i=0;i<7;i++) rr(x,130+i*3,140,2,3,1,'#8a8a92'); // dientes
+  // cabeza chica
+  shade(x,76,86,24,27,SKINh,SKINd);
+  ell(x,52,88,5,8,SKINd); ell(x,100,88,5,8,SKINd);
+  // ceño y ojos
+  ell(x,68,86,5,3,'#fff'); ell(x,86,86,5,3,'#fff');
+  ell(x,68,86,2.5,2.5,'#241811'); ell(x,86,86,2.5,2.5,'#241811');
+  rr(x,62,80,12,3,1,'#241811'); rr(x,80,80,12,3,1,'#241811'); // cejas fruncidas
+  rr(x,68,98,16,3,2,'#7a3b34'); // boca torcida
+  // PELUCA enorme y desprolija
+  x.fillStyle=WIG;
+  x.beginPath();x.moveTo(50,88);x.quadraticCurveTo(40,40,76,36);x.quadraticCurveTo(112,40,102,88);
+  x.quadraticCurveTo(96,60,76,58);x.quadraticCurveTo(56,60,50,88);x.closePath();x.fill();
+  ell(x,76,52,30,20,WIG); // copete
+  ell(x,72,50,18,10,WIGh); // brillo
+  rr(x,48,80,8,26,4,WIG); rr(x,96,80,8,26,4,WIG); // patillas largas
+  // mechones despeinados
+  ell(x,44,66,6,12,WIG,-.5); ell(x,110,66,6,12,WIG,.5); ell(x,76,34,7,10,WIG);
+  return c;
+}
+
+/* ---------------- ESCENA ---------------- */
+class Fight extends Phaser.Scene{
+  constructor(){super('Fight');}
+  preload(){
+    this.textures.addCanvas('hero',heroCanvas()); this.textures.addCanvas('villain',villainCanvas());
+    this.heroTex='hero'; this.villTex='villain';
+    // foto real del Presidente (ya existe -> carga rápida, sin 404)
+    this.load.image('presidente','assets/presidente.png');
+    this.load.on('filecomplete-image-presidente',()=>{ this.heroTex='presidente'; });
+  }
+  create(){
+    this.drawStage();
+    this.p1=this.mkFighter(240,this.heroTex,1,false); this.p2=this.mkFighter(680,this.villTex,-1,true);
+    this.p1.foe=this.p2; this.p2.foe=this.p1;
+    this.hud=this.buildHUD();
+    this.add.text(W-8,H-6,'v3',{fontFamily:'Oswald',fontSize:'11px',color:'#6a5a3a'}).setOrigin(1,1).setDepth(80);
+    this.winsP1=0;this.winsP2=0;this.roundNo=0; this.startRound();
+  }
+
+  drawStage(){
+    const g=this.add.graphics();
+    // pared interior cálida
+    const wall=g.fillGradientStyle;
+    g.fillGradientStyle(0x2a2018,0x2a2018,0x140f0a,0x140f0a,1); g.fillRect(0,0,W,GROUND);
+    // TAPIZ colgado (como en la referencia)
+    const tx=W/2-260, tw=520, ty=40, th=300;
+    g.fillStyle(0x6b4a2c,1); g.fillRect(tx-6,ty-6,tw+12,th+12);      // marco
+    g.fillStyle(0x4a3a5a,1); g.fillRect(tx,ty,tw,th);                // fondo tapiz
+    // patrón del tapiz
+    g.fillStyle(0x7a5a3a,.5);
+    for(let i=0;i<8;i++) for(let j=0;j<5;j++){ g.fillRect(tx+20+i*62,ty+24+j*58,40,38); }
+    g.fillStyle(0x8a6a9a,.35);
+    for(let i=0;i<8;i++) for(let j=0;j<5;j++){ g.fillRect(tx+30+i*62,ty+34+j*58,20,18); }
+    // luz cálida superior
+    const lg=this.add.graphics(); lg.fillStyle(0xffcf7a,.10); lg.fillRect(0,0,W,180);
+    // piso de madera
+    g.fillStyle(0x3a2a1c,1); g.fillRect(0,GROUND,W,H-GROUND);
+    g.fillStyle(0x2c2015,1);
+    for(let xx=0;xx<W;xx+=70) g.fillRect(xx,GROUND,4,H-GROUND);
+    g.fillStyle(0x4a3626,1); g.fillRect(0,GROUND,W,6);
+    // micrófono de podcast (decorado, al costado)
+    const mg=this.add.graphics(); mg.fillStyle(0x111111,1);
+    mg.fillRect(150,GROUND-4,4,-140); mg.fillRect(120,GROUND-140,64,6);
+    mg.fillStyle(0x1a1a1a,1); mg.fillCircle(120,GROUND-150,14); mg.fillStyle(0x333,1); mg.fillCircle(120,GROUND-150,10);
+    // vignette suave
+    const v=this.add.graphics(); v.setDepth(40);
+    v.fillStyle(0x000000,.0);
+    const vg=v; // radial vignette via alpha rects
+    for(let i=0;i<6;i++){ v.fillStyle(0x000000,.06); v.fillRect(i*6,i*6,W-i*12,H-i*12); }
+  }
+
+  mkFighter(x,tex,facing,isCPU){
+    const s=this.add.image(x,GROUND,tex).setOrigin(.5,1);
+    const base=215/s.height; s.setScale(base); s.setFlipX(facing<0); // normaliza alto (dibujo o imagen real)
+    return {sprite:s,base,hp:100,facing,isCPU,vx:0,vy:0,onGround:true,state:'idle',stateT:0,cool:0,
+      hitDone:false,attackKind:'punch',attackActive:false,block:false,stun:0,think:0,ko:false,active:false};
+  }
+
+  buildHUD(){
+    const mk=(x,align,col)=>{
+      this.add.rectangle(x,36,378,26,0x120d08).setOrigin(align,.5).setStrokeStyle(2,0x4a3a26).setDepth(60);
+      const bar=this.add.rectangle(x+(align?-3:3),36,372,18,col).setOrigin(align,.5).setDepth(61);
+      return {bar,full:372};
+    };
+    const l=mk(28,0,0x8fb14a), r=mk(W-28,1,0xe0b23a);
+    this.add.text(30,54,'EL PRESIDENTE',{fontFamily:'Oswald',fontSize:'15px',color:'#cfe08a'}).setDepth(61);
+    this.add.text(W-30,54,'EL PELUCÓN',{fontFamily:'Oswald',fontSize:'15px',color:'#e0b23a'}).setOrigin(1,0).setDepth(61);
+    this.pips=this.add.text(W/2,22,'',{fontFamily:'Oswald',fontSize:'16px',color:'#efe6d6'}).setOrigin(.5).setDepth(61);
+    this.center=this.add.text(W/2,H/2-30,'',{fontFamily:'Special Elite',fontSize:'40px',color:'#e0432a',
+      stroke:'#000',strokeThickness:5,align:'center'}).setOrigin(.5).setDepth(70);
+    return {l,r};
+  }
+
+  startRound(){
+    this.roundNo++;
+    this.p1.hp=this.p2.hp=100;this.p1.ko=this.p2.ko=false;
+    this.p1.sprite.x=240;this.p2.sprite.x=680;this.p1.sprite.y=this.p2.sprite.y=GROUND;
+    this.p1.vy=this.p2.vy=this.p1.vx=this.p2.vx=0;this.p1.facing=1;this.p2.facing=-1;
+    this.roundOver=false;this.matchOver=false;this.p1.active=this.p2.active=false;
+    this.pips.setText('★'.repeat(this.winsP1)+'   ROUND '+this.roundNo+'   '+'★'.repeat(this.winsP2));
+    this.center.setColor('#e8c15a').setFontSize(40).setText('ROUND '+this.roundNo);
+    this.time.delayedCall(900,()=>{
+      this.center.setColor('#e0432a').setText('¡PELEEN!'); this.p1.active=this.p2.active=true;
+      this.time.delayedCall(700,()=>{ if(!this.roundOver) this.center.setText(''); });
+    });
+  }
+
+  tryAttack(f,kind){
+    if(f.cool>0||f.stun>0||!f.onGround||f.state==='attack'||!f.active) return;
+    f.state='attack';f.attackKind=kind;f.hitDone=false;
+    f.stateT=kind==='kick'?320:240; f.cool=kind==='kick'?520:360;
+  }
+  attackHitbox(f){ const s=f.sprite,reach=f.attackKind==='kick'?76:60;
+    const x=f.facing>0?s.x+24:s.x-24-reach; return new Phaser.Geom.Rectangle(x,s.y-125,reach,52); }
+  bodyRect(f){ const s=f.sprite; return new Phaser.Geom.Rectangle(s.x-28,s.y-165,56,160); }
+
+  hurt(t,a,dmg,kb){
+    if(t.block){dmg=Math.ceil(dmg*.25);kb*=.4;}
+    t.hp=Math.max(0,t.hp-dmg);t.vx=a.facing*kb;t.stun=t.block?120:300;
+    t.sprite.setTint(0xff7766); this.time.delayedCall(120,()=>t.sprite.clearTint());
+    if(t.hp<=0&&!this.roundOver) this.endRound(t);
+  }
+  endRound(loser){
+    this.roundOver=true;loser.ko=true;this.p1.active=this.p2.active=false;
+    const winner=loser===this.p1?this.p2:this.p1;
+    if(winner===this.p1)this.winsP1++;else this.winsP2++;
+    this.center.setColor('#e0432a').setFontSize(46).setText('¡K.O.!');
+    this.pips.setText('★'.repeat(this.winsP1)+'   ROUND '+this.roundNo+'   '+'★'.repeat(this.winsP2));
+    this.time.delayedCall(1300,()=>{
+      if(this.winsP1>=2||this.winsP2>=2){
+        this.matchOver=true;
+        const msg=this.winsP1>=2?'GANA EL PRESIDENTE\n\nse gana pensando en el otro':'GANA EL PELUCÓN';
+        this.center.setColor(this.winsP1>=2?'#8fd14f':'#e0b23a').setFontSize(26).setText(msg+'\n\nENTER = revancha');
+      } else this.startRound();
+    });
+  }
+
+  update(t,delta){
+    const dt=delta/1000;
+    if(this.matchOver){ if(touch.enter){touch.enter=false;this.winsP1=this.winsP2=0;this.roundNo=0;this.startRound();} return; }
+    touch.enter=false;
+    this.step(this.p1,dt,true); this.step(this.p2,dt,false);
+    this.resolve(); this.updateHUD();
+  }
+  step(f,dt,isPlayer){
+    const s=f.sprite; f.facing=(f.foe.sprite.x>=s.x)?1:-1; s.setFlipX(f.facing<0); f.block=false;
+    if(f.stun>0) f.stun-=dt*1000;
+    else if(f.active){ if(isPlayer)this.playerInput(f); else this.cpuInput(f,dt); }
+    if(f.cool>0) f.cool-=dt*1000;
+    if(f.state==='attack'){
+      f.stateT-=dt*1000;
+      const act=f.attackKind==='kick'?(f.stateT<210&&f.stateT>90):(f.stateT<170&&f.stateT>70);
+      f.attackActive=act; if(act) f.vx=f.facing*160;
+      if(f.stateT<=0){f.state='idle';f.attackActive=false;}
+    }
+    f.vy+=GRAV*dt; s.x+=f.vx*dt; s.y+=f.vy*dt; f.vx*=(f.onGround?.80:.94); if(Math.abs(f.vx)<4)f.vx=0;
+    if(s.y>=GROUND){s.y=GROUND;f.vy=0;f.onGround=true;} else f.onGround=false;
+    s.x=Phaser.Math.Clamp(s.x,50,W-50);
+    s.setAngle(f.state==='attack'&&f.attackActive?f.facing*7:0);
+    s.setScale(f.base, f.block?f.base*.9:f.base); // el giro lo maneja setFlipX
+  }
+  playerInput(f){
+    if(touch.down&&f.onGround) f.block=true;
+    else{ if(touch.left)f.vx=-260; if(touch.right)f.vx=260; if(touch.jump&&f.onGround){f.vy=-600;f.onGround=false;} }
+    touch.jump=false; // el salto es de un toque
+    if(touch.punch){ this.tryAttack(f,'punch'); touch.punch=false; }
+    if(touch.kick){ this.tryAttack(f,'kick'); touch.kick=false; }
+  }
+  cpuInput(f,dt){
+    const d=f.foe.sprite.x-f.sprite.x, ad=Math.abs(d); f.think-=dt*1000;
+    if(f.foe.state==='attack'&&ad<100&&Math.random()<.15){f.block=true;return;}
+    if(ad>95)f.vx=Math.sign(d)*230; else if(ad<58)f.vx=-Math.sign(d)*180;
+    if(f.think<=0){ f.think=Phaser.Math.Between(300,700);
+      if(ad<86&&f.onGround)this.tryAttack(f,Math.random()<.5?'punch':'kick');
+      else if(Math.random()<.15&&f.onGround){f.vy=-560;f.onGround=false;} }
+  }
+  resolve(){
+    [[this.p1,this.p2],[this.p2,this.p1]].forEach(([a,d])=>{
+      if(a.state==='attack'&&a.attackActive&&!a.hitDone){
+        if(Phaser.Geom.Intersects.RectangleToRectangle(this.attackHitbox(a),this.bodyRect(d))){
+          a.hitDone=true; this.hurt(d,a,a.attackKind==='kick'?13:8,a.attackKind==='kick'?320:220);
+        }
+      }
+    });
+  }
+  updateHUD(){ this.hud.l.bar.width=this.hud.l.full*(this.p1.hp/100); this.hud.r.bar.width=this.hud.r.full*(this.p2.hp/100); }
+}
+
+window.game = new Phaser.Game({ type:Phaser.AUTO,width:W,height:H,parent:'game',backgroundColor:'#0d0b0a',antialias:true,scene:[Fight] });
+</script>
+</body>
+</html>

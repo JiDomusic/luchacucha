@@ -153,8 +153,18 @@ class Fight extends Phaser.Scene {
     this.load.start();
   }
   applyHeroPhoto(){
+    // compone: cuerpo camuflado dibujado + cara REAL recortada en óvalo (sin fondo)
+    const src = this.textures.get('presidente').getSourceImage();
+    const comp = C(150,210), x = comp.getContext('2d');
+    x.drawImage(heroCanvas(), 0, 0);                 // cuerpo camuflado + mate
+    x.save();
+    x.beginPath(); x.ellipse(76,46,45,60,0,0,7); x.clip();  // óvalo cabeza (elimina el fondo del tapiz)
+    x.drawImage(src, 45,18, 210,360, 29,-18, 94,132);       // cabeza real (turbante+cara+barba)
+    x.restore();
+    if (this.textures.exists('presidente_comp')) this.textures.remove('presidente_comp');
+    this.textures.addCanvas('presidente_comp', comp);
     const s = this.p1.sprite;
-    s.setTexture('presidente');
+    s.setTexture('presidente_comp');
     this.p1.base = 215 / s.height;
     s.setScale(this.p1.base);
     s.setFlipX(this.p1.facing < 0);
