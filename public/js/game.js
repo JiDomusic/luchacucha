@@ -196,7 +196,7 @@ class Fight extends Phaser.Scene {
     };
     const l=mk(28,0,0x8fb14a), r=mk(W-28,1,0xe0b23a);
     this.add.text(30,54,'EL PRESIDENTE',{fontFamily:'Oswald',fontSize:'15px',color:'#cfe08a'}).setDepth(61);
-    this.add.text(W-30,54,'EL PELUCÓN',{fontFamily:'Oswald',fontSize:'15px',color:'#e0b23a'}).setOrigin(1,0).setDepth(61);
+    this.add.text(W-30,54,'EL EX PRESIDENTE',{fontFamily:'Oswald',fontSize:'15px',color:'#e0b23a'}).setOrigin(1,0).setDepth(61);
     this.pips=this.add.text(W/2,22,'',{fontFamily:'Oswald',fontSize:'16px',color:'#efe6d6'}).setOrigin(.5).setDepth(61);
     this.center=this.add.text(W/2,H/2-30,'',{fontFamily:'Special Elite',fontSize:'40px',color:'#e0432a',
       stroke:'#000',strokeThickness:5,align:'center'}).setOrigin(.5).setDepth(70);
@@ -241,7 +241,7 @@ class Fight extends Phaser.Scene {
     this.time.delayedCall(1300,()=>{
       if(this.winsP1>=2||this.winsP2>=2){
         this.matchOver=true;
-        const msg=this.winsP1>=2?'GANA EL PRESIDENTE\n\nse gana pensando en el otro':'GANA EL PELUCÓN';
+        const msg=this.winsP1>=2?'GANA EL PRESIDENTE\n\nse gana pensando en el otro':'GANA EL EX PRESIDENTE';
         this.center.setColor(this.winsP1>=2?'#8fd14f':'#e0b23a').setFontSize(26).setText(msg+'\n\nENTER = revancha');
       } else this.startRound();
     });
