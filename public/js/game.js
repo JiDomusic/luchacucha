@@ -31,7 +31,19 @@ const Sfx = {
   block(){ this.tone(240,0.06,'square',0.12); },
   jump(){ this.tone(320,0.12,'square',0.14,640); },
   ko(){ this.tone(420,0.5,'sawtooth',0.3,60); },
-  fight(){ this.tone(520,0.1,'square',0.2); setTimeout(()=>this.tone(720,0.16,'square',0.2),110); }
+  fight(){ this.tone(520,0.1,'square',0.2); setTimeout(()=>this.tone(720,0.16,'square',0.2),110); },
+  // música de fondo (chiptune) con toggle
+  musicTimer:null, mStep:0, melody:[330,392,494,588,494,392,330,262,294,349,440,349],
+  toggleMusic(){
+    this.ensure();
+    if(this.musicTimer){ clearInterval(this.musicTimer); this.musicTimer=null; return false; }
+    this.musicTimer=setInterval(()=>{
+      const f=this.melody[this.mStep%this.melody.length]; this.mStep++;
+      this.tone(f,0.16,'triangle',0.05);                 // melodía
+      if(this.mStep%2===0) this.tone(f/2,0.22,'square',0.035); // bajo
+    },250);
+    return true;
+  }
 };
 
 window.addEventListener('keydown', e => {
