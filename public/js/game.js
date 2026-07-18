@@ -9,7 +9,33 @@ const W = 920, H = 540, GROUND = 470, GRAV = 1500;
 /* ---------------- INPUT unificado (teclado + botones) ---------------- */
 const input = { left:false, right:false, down:false, jump:false, punch:false, kick:false, enter:false };
 
+/* ---------------- SONIDO (Web Audio, sin archivos) ---------------- */
+const Sfx = {
+  ctx: null,
+  ensure(){ if(!this.ctx){ try{ this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+            if(this.ctx && this.ctx.state==='suspended') this.ctx.resume(); },
+  tone(freq,dur,type,vol,slideTo){ this.ensure(); if(!this.ctx) return;
+    const t=this.ctx.currentTime, o=this.ctx.createOscillator(), g=this.ctx.createGain();
+    o.type=type||'square'; o.frequency.setValueAtTime(freq,t);
+    if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo,t+dur);
+    g.gain.setValueAtTime(vol||0.2,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g).connect(this.ctx.destination); o.start(t); o.stop(t+dur); },
+  noise(dur,vol){ this.ensure(); if(!this.ctx) return;
+    const t=this.ctx.currentTime, n=this.ctx.createBufferSource();
+    const buf=this.ctx.createBuffer(1,Math.max(1,this.ctx.sampleRate*dur),this.ctx.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length);
+    n.buffer=buf; const g=this.ctx.createGain(); g.gain.setValueAtTime(vol||0.25,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    n.connect(g).connect(this.ctx.destination); n.start(t); n.stop(t+dur); },
+  hit(){ this.tone(170,0.12,'triangle',0.25,60); this.noise(0.09,0.18); },
+  kick(){ this.tone(110,0.18,'sawtooth',0.28,45); this.noise(0.12,0.22); },
+  block(){ this.tone(240,0.06,'square',0.12); },
+  jump(){ this.tone(320,0.12,'square',0.14,640); },
+  ko(){ this.tone(420,0.5,'sawtooth',0.3,60); },
+  fight(){ this.tone(520,0.1,'square',0.2); setTimeout(()=>this.tone(720,0.16,'square',0.2),110); }
+};
+
 window.addEventListener('keydown', e => {
+  Sfx.ensure();
   switch (e.code) {
     case 'ArrowLeft':  input.left = true;  e.preventDefault(); break;
     case 'ArrowRight': input.right = true; e.preventDefault(); break;
@@ -28,7 +54,7 @@ window.addEventListener('keyup', e => {
 function wireButtons() {
   document.querySelectorAll('#pad .btn').forEach(b => {
     const k = b.dataset.k;
-    const press = e => { e.preventDefault(); b.classList.add('on');
+    const press = e => { e.preventDefault(); Sfx.ensure(); b.classList.add('on');
       if (k === 'up') input.jump = true;
       else if (k === 'punch') input.punch = true;
       else if (k === 'kick') input.kick = true;
@@ -121,6 +147,27 @@ function villainCanvas(){
   return c;
 }
 
+/* séquito del Presidente: figura pequeña con túnica + turbante árabe */
+function allyCanvas(robe, turb){
+  const c=C(60,104), x=c.getContext('2d');
+  const SKIN='#d59a6e', SKINd='#b0774d', ROBEd=robe.d, ROBE=robe.c, TURB=turb;
+  ell(x,30,101,17,4,'rgba(0,0,0,.32)');
+  // túnica larga (kaftán) con sombreado
+  const rg=x.createLinearGradient(12,44,48,100); rg.addColorStop(0,ROBE); rg.addColorStop(1,ROBEd);
+  x.fillStyle=rg; x.beginPath(); x.moveTo(19,46); x.lineTo(41,46); x.lineTo(48,100); x.lineTo(12,100); x.closePath(); x.fill();
+  x.fillStyle=ROBEd; x.fillRect(28,48,3,52);
+  rr(x,10,48,10,32,4,ROBE); rr(x,40,48,10,30,4,ROBE); // mangas
+  shade(x,14,80,5,5,'#e6b487',SKINd); shade(x,46,78,5,5,'#e6b487',SKINd); // manos
+  shade(x,30,33,13,15,'#e6b487',SKINd); // cabeza
+  ell(x,30,44,11,7,'#2e2118'); // barba
+  ell(x,26,33,1.8,1.8,'#201810'); ell(x,34,33,1.8,1.8,'#201810'); // ojos
+  // turbante
+  const tg=x.createLinearGradient(18,16,42,30); tg.addColorStop(0,TURB); tg.addColorStop(1,'#cfc7b2');
+  x.fillStyle=tg; x.beginPath(); x.moveTo(18,31); x.quadraticCurveTo(16,15,30,14);
+  x.quadraticCurveTo(44,15,42,31); x.quadraticCurveTo(36,23,30,23); x.quadraticCurveTo(24,23,18,31); x.closePath(); x.fill();
+  return c;
+}
+
 /* ---------------- escena ---------------- */
 class Fight extends Phaser.Scene {
   constructor(){ super('Fight'); }
@@ -129,6 +176,9 @@ class Fight extends Phaser.Scene {
     // sólo dibujos: NO se carga nada externo aquí, así el juego arranca siempre
     this.textures.addCanvas('hero', heroCanvas());
     this.textures.addCanvas('villain', villainCanvas());
+    this.textures.addCanvas('ally1', allyCanvas({c:'#e8e2d2',d:'#cabf9f'}, '#f2ede0'));
+    this.textures.addCanvas('ally2', allyCanvas({c:'#c9b48a',d:'#a98f63'}, '#e5ddc8'));
+    this.textures.addCanvas('ally3', allyCanvas({c:'#b9a7d0',d:'#9784b0'}, '#efe9df'));
   }
 
   create(){
@@ -137,6 +187,9 @@ class Fight extends Phaser.Scene {
     this.p1 = this.mkFighter(240, 'hero', 1, false);
     this.p2 = this.mkFighter(680, 'villain', -1, true);
     this.p1.foe = this.p2; this.p2.foe = this.p1;
+    // colores de miembros: Presidente (camuflado) / Ex Presidente (traje)
+    this.p1.skinCol=0xe6b487; this.p1.legCol=0x5b6338; this.p1.footCol=0x241d14;
+    this.p2.skinCol=0xe8bb8d; this.p2.legCol=0x1c1a20; this.p2.footCol=0x0d0d10;
     this.hud = this.buildHUD();
     this.add.text(W-8, H-6, 'v4', {fontFamily:'Oswald',fontSize:'11px',color:'#6a5a3a'}).setOrigin(1,1).setDepth(80);
     this.winsP1 = 0; this.winsP2 = 0; this.roundNo = 0;
@@ -187,6 +240,10 @@ class Fight extends Phaser.Scene {
     const mg=this.add.graphics(); mg.fillStyle(0x111111,1);
     mg.fillRect(150,GROUND-4,4,-140); mg.fillRect(120,GROUND-140,64,6);
     mg.fillStyle(0x1a1a1a,1); mg.fillCircle(120,GROUND-150,14); mg.fillStyle(0x333333,1); mg.fillCircle(120,GROUND-150,10);
+    // séquito del Presidente (izquierda): figuras más pequeñas con túnica árabe
+    [['ally2',48,.84],['ally1',98,.66],['ally3',152,.75]].forEach(([tex,ax,sc])=>{
+      this.add.image(ax,GROUND-2,tex).setOrigin(.5,1).setScale(sc);
+    });
     const v=this.add.graphics(); v.setDepth(40);
     for(let i=0;i<6;i++){ v.fillStyle(0x000000,.06); v.fillRect(i*6,i*6,W-i*12,H-i*12); }
   }
@@ -194,8 +251,22 @@ class Fight extends Phaser.Scene {
   mkFighter(x,tex,facing){
     const s=this.add.image(x,GROUND,tex).setOrigin(.5,1);
     const base=215/s.height; s.setScale(base); s.setFlipX(facing<0);
-    return {sprite:s,base,hp:100,facing,vx:0,vy:0,onGround:true,state:'idle',stateT:0,cool:0,
-      hitDone:false,attackKind:'punch',attackActive:false,block:false,stun:0,think:0,ko:false,active:false};
+    const limb=this.add.graphics().setDepth(1);   // pierna/brazo que se estira al golpear
+    return {sprite:s,limb,base,hp:100,facing,vx:0,vy:0,onGround:true,state:'idle',stateT:0,cool:0,
+      hitDone:false,attackKind:'punch',attackActive:false,block:false,stun:0,think:0,ko:false,active:false,
+      skinCol:0xe6b487,legCol:0x5b6338,footCol:0x241d14};
+  }
+
+  drawLimb(f){
+    const g=f.limb; g.clear();
+    if(f.state!=='attack' || !f.attackActive) return;
+    const s=f.sprite, dir=f.facing, kick=(f.attackKind==='kick');
+    const y=s.y-(kick?48:96), length=kick?78:56, th=kick?17:12;
+    const startX=s.x+dir*8, endX=startX+dir*length;
+    g.fillStyle(kick?f.legCol:f.skinCol,1);
+    g.fillRect(Math.min(startX,endX), y-th/2, length, th);           // pierna o brazo
+    g.fillStyle(kick?f.footCol:f.skinCol,1);
+    g.fillCircle(endX, y, kick?11:9);                                // borceguí / puño
   }
 
   buildHUD(){
@@ -222,7 +293,7 @@ class Fight extends Phaser.Scene {
     this.pips.setText('★'.repeat(this.winsP1)+'   ROUND '+this.roundNo+'   '+'★'.repeat(this.winsP2));
     this.center.setColor('#e8c15a').setFontSize(40).setText('ROUND '+this.roundNo);
     this.time.delayedCall(900,()=>{
-      this.center.setColor('#e0432a').setText('¡PELEEN!'); this.p1.active=this.p2.active=true;
+      this.center.setColor('#e0432a').setText('¡PELEEN!'); this.p1.active=this.p2.active=true; Sfx.fight();
       this.time.delayedCall(700,()=>{ if(!this.roundOver) this.center.setText(''); });
     });
   }
@@ -237,7 +308,8 @@ class Fight extends Phaser.Scene {
   bodyRect(f){ const s=f.sprite; return new Phaser.Geom.Rectangle(s.x-28,s.y-165,56,160); }
 
   hurt(t,a,dmg,kb){
-    if(t.block){dmg=Math.ceil(dmg*.25);kb*=.4;}
+    if(t.block){dmg=Math.ceil(dmg*.25);kb*=.4; Sfx.block();}
+    else { a.attackKind==='kick' ? Sfx.kick() : Sfx.hit(); }
     t.hp=Math.max(0,t.hp-dmg); t.vx=a.facing*kb; t.stun=t.block?120:300;
     t.sprite.setTint(0xff7766); this.time.delayedCall(120,()=>t.sprite.clearTint());
     if(t.hp<=0&&!this.roundOver) this.endRound(t);
@@ -246,7 +318,7 @@ class Fight extends Phaser.Scene {
     this.roundOver=true; loser.ko=true; this.p1.active=this.p2.active=false;
     const winner=loser===this.p1?this.p2:this.p1;
     if(winner===this.p1)this.winsP1++;else this.winsP2++;
-    this.center.setColor('#e0432a').setFontSize(46).setText('¡K.O.!');
+    this.center.setColor('#e0432a').setFontSize(46).setText('¡K.O.!'); Sfx.ko();
     this.pips.setText('★'.repeat(this.winsP1)+'   ROUND '+this.roundNo+'   '+'★'.repeat(this.winsP2));
     this.time.delayedCall(1300,()=>{
       if(this.winsP1>=2||this.winsP2>=2){
@@ -259,7 +331,7 @@ class Fight extends Phaser.Scene {
 
   update(t,delta){
     const dt=delta/1000;
-    if(this.matchOver){ if(input.enter){input.enter=false;this.winsP1=this.winsP2=0;this.roundNo=0;this.startRound();} return; }
+    if(this.matchOver){ this.p1.limb.clear(); this.p2.limb.clear(); if(input.enter){input.enter=false;this.winsP1=this.winsP2=0;this.roundNo=0;this.startRound();} return; }
     input.enter=false;
     this.step(this.p1,dt,true); this.step(this.p2,dt,false);
     this.resolve(); this.updateHUD();
@@ -280,10 +352,11 @@ class Fight extends Phaser.Scene {
     s.x=Phaser.Math.Clamp(s.x,50,W-50);
     s.setAngle(f.state==='attack'&&f.attackActive?f.facing*7:0);
     s.setScale(f.base, f.block?f.base*.9:f.base);
+    this.drawLimb(f);
   }
   playerInput(f){
     if(input.down&&f.onGround) f.block=true;
-    else{ if(input.left)f.vx=-260; if(input.right)f.vx=260; if(input.jump&&f.onGround){f.vy=-600;f.onGround=false;} }
+    else{ if(input.left)f.vx=-260; if(input.right)f.vx=260; if(input.jump&&f.onGround){f.vy=-600;f.onGround=false;Sfx.jump();} }
     input.jump=false;
     if(input.punch){ this.tryAttack(f,'punch'); input.punch=false; }
     if(input.kick){ this.tryAttack(f,'kick'); input.kick=false; }

@@ -27,6 +27,9 @@
   .btn:active,.btn.on{transform:translateY(3px);box-shadow:0 1px 0 #0d0b08;background:#3a2f20}
   .btn.hit{border-color:#e0432a;color:#ffcf7a}
   .btn.jump{border-color:#8fb14a}
+  .refresh{background:#221d16;border:2px solid #4a3a26;color:#e8c15a;font-family:'Oswald';
+    font-weight:700;font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;letter-spacing:.5px}
+  .refresh:active{transform:translateY(2px)}
   /* responsivo: pantallas chicas */
   @media (max-width:640px){
     body{gap:8px;padding:6px}
@@ -49,9 +52,21 @@
     kbd{display:none}
     a.back{display:none}
   }
+  /* CELULAR HORIZONTAL: juego a pantalla completa, controles superpuestos */
+  @media (orientation:landscape) and (max-height:600px){
+    body{padding:0;gap:0;justify-content:center}
+    .rotate,.hint,a.back{display:none}
+    #game{width:min(100vw, calc((100dvh - 4px) * 1.7037));max-width:none;aspect-ratio:920/540}
+    #pad{position:fixed;left:0;right:0;bottom:8px;width:auto;padding:0 10px;
+      justify-content:space-between;pointer-events:none;background:none;z-index:5}
+    #pad .cluster{gap:8px}
+    #pad .btn{pointer-events:auto;opacity:.85;width:50px;height:50px;font-size:11px}
+    .refresh{position:fixed;top:6px;right:8px;z-index:6;font-size:11px;padding:4px 9px}
+  }
 </style>
 </head>
 <body>
+  <button class="refresh" type="button" onclick="location.replace(location.pathname+'?v='+Date.now())">🔄 Actualizar</button>
   <div class="rotate">📱↔️ Girá el teléfono para verlo más grande</div>
   <div id="game"></div>
   <div class="hint">
