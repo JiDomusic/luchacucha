@@ -30,7 +30,7 @@
 <body>
   <div id="game"></div>
   <div class="hint">
-    <b>EL COMANDANTE</b> &nbsp;·&nbsp; <kbd>←</kbd><kbd>→</kbd> mover &nbsp; <kbd>↑</kbd> saltar &nbsp; <kbd>↓</kbd> cubrirse &nbsp; <kbd>Z</kbd> puño &nbsp; <kbd>X</kbd> patada &nbsp;·&nbsp; <kbd>Enter</kbd> reiniciar
+    <b>EL PRESIDENTE</b> &nbsp;·&nbsp; <kbd>←</kbd><kbd>→</kbd> mover &nbsp; <kbd>↑</kbd> saltar &nbsp; <kbd>↓</kbd> cubrirse &nbsp; <kbd>Z</kbd> puño &nbsp; <kbd>X</kbd> patada &nbsp;·&nbsp; <kbd>Enter</kbd> reiniciar
   </div>
   <div id="pad">
     <div class="cluster">
@@ -100,7 +100,7 @@ function shade(ctx,cx,cy,rx,ry,c1,c2){
   ctx.save();ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,7);ctx.fillStyle=g;ctx.fill();ctx.restore();
 }
 
-/* ---------------- EL COMANDANTE (basado en la referencia real) ---------------- */
+/* ---------------- EL PRESIDENTE (basado en la referencia real) ---------------- */
 /* paño/turbante blanco, barba tupida, campera camuflada, mate */
 function heroCanvas(){
   const c=C(150,210),x=c.getContext('2d');
@@ -201,6 +201,9 @@ class Fight extends Phaser.Scene{
   preload(){
     this.textures.addCanvas('hero',heroCanvas()); this.textures.addCanvas('villain',villainCanvas());
     this.heroTex='hero'; this.villTex='villain';
+    // foto real del Presidente (ya existe -> carga rápida, sin 404)
+    this.load.image('presidente','assets/presidente.png');
+    this.load.on('filecomplete-image-presidente',()=>{ this.heroTex='presidente'; });
   }
   create(){
     this.drawStage();
@@ -257,7 +260,7 @@ class Fight extends Phaser.Scene{
       return {bar,full:372};
     };
     const l=mk(28,0,0x8fb14a), r=mk(W-28,1,0xe0b23a);
-    this.add.text(30,54,'EL COMANDANTE',{fontFamily:'Oswald',fontSize:'15px',color:'#cfe08a'}).setDepth(61);
+    this.add.text(30,54,'EL PRESIDENTE',{fontFamily:'Oswald',fontSize:'15px',color:'#cfe08a'}).setDepth(61);
     this.add.text(W-30,54,'EL PELUCÓN',{fontFamily:'Oswald',fontSize:'15px',color:'#e0b23a'}).setOrigin(1,0).setDepth(61);
     this.pips=this.add.text(W/2,22,'',{fontFamily:'Oswald',fontSize:'16px',color:'#efe6d6'}).setOrigin(.5).setDepth(61);
     this.center=this.add.text(W/2,H/2-30,'',{fontFamily:'Special Elite',fontSize:'40px',color:'#e0432a',
@@ -303,7 +306,7 @@ class Fight extends Phaser.Scene{
     this.time.delayedCall(1300,()=>{
       if(this.winsP1>=2||this.winsP2>=2){
         this.matchOver=true;
-        const msg=this.winsP1>=2?'GANA EL COMANDANTE\n\nse gana pensando en el otro':'GANA EL PELUCÓN';
+        const msg=this.winsP1>=2?'GANA EL PRESIDENTE\n\nse gana pensando en el otro':'GANA EL PELUCÓN';
         this.center.setColor(this.winsP1>=2?'#8fd14f':'#e0b23a').setFontSize(26).setText(msg+'\n\nENTER = revancha');
       } else this.startRound();
     });
